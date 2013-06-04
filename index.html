@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta http-equiv="content-style-type" content="text/css">
+    <meta http-equiv="content-script-type" content="text/javascript">
+    <meta name="description" content="">
+    <title>アンケート</title>
+    <style>
+body {
+  background-color: #CCCCCC;
+}
+#question {
+  background-color: #FFFFFF;
+  width: 600px;
+  padding: 10px 20px;
+  margin: 0 auto;
+  border: 2px solid #000000;
+  border-radius: 20px;
+}
+#question h1 {
+  text-align:center;
+  text-decoration: underline;
+}
+#question div.message {
+  text-align:center;
+}
+#question .error {
+  color: red;
+}
+#form div.error {
+  background-color: red;
+}
+#form {
+  border-spacing 0;
+  text-align: left;
+  vertical-align: top;
+  width:100%;
+}
+#form th{
+  padding-top: 15px;
+  vertical-align: top;
+  width: 250px;
+  border-bottom: 1px dashed #000000;
+}
+#form th span.required{
+  font-size:0.5em;
+  color:red;
+}
+#form td{
+  vertical-align: top;
+  border-bottom: 1px dashed #000000;
+}
+#form td > div {
+  padding-top: 15px;
+  padding-bottom: 15px;
+  padding-left:20px;
+}
+#form textarea {
+  height:200px;
+  width:300px;
+}
+    </style>
+</head>
+<body>
+  <div id="question">
+    <h1>MongoDBアンケート</h1>
+    <div class="message"></div>
+    <table id="form" post="http://localhost:28017/questions/"></table>
+    <input id="finish" type="button" value="送信"></input>
+  </div>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+<script language=javascript>
+<!--
+$(function(){
+  var form = $('#form');
+  var url = form.attr('post');
+  function uid (){
+   function genid(){
+     return (((1+Math.random())*0x10000)|0).toString(16).substring(1);
+   }
+   return 'a'+genid()+genid()+genid();
+  }
+  function gen_form(fdata){
+      $('<input />')
+      .attr('type','hidden')
+      .attr('name','_id')
+      .val(uid())
+      .appendTo('#form');
+    var tbody = $('<tbody />')
+      .appendTo('#form');
+
+    for ( var i in fdata.form ) {
+      var tr = $('<tr />')
+	.addClass('q')
+	.addClass('q'+i)
+	.appendTo(tbody);
+      var question=fdata.form[i];
+	var th = $('<th />')
+	.text(question.q)
+	.appendTo(tr);
+      if ( question.required ) {
+	$('<span />')
+	  .addClass('required')
+	  .text('(必須)')
+	  .appendTo(th);
+      }
+      var border = $('<div />')
+	.attr('type',question.a.type)
+	.attr('name',question.a.name)
+	.appendTo(
+		  $('<td />')
+		  .appendTo(tr));
+      if ( question.required ) {
+	border.attr('required','required');
+      }
+      var input = null;
+      if       ( question.a.type ==='text' ) {
+	input = $('<input />')
+	  .attr('type','text')
+	  .appendTo(border);
+      }else if ( question.a.type ==='number' ) {
+	input = $('<input />')
+	  .attr('type','number')
+	  .appendTo(border);
+      }else if ( question.a.type ==='textarea' ) {
+	input = $('<textarea />')
+	  .appendTo(border);
+      }else if ( question.a.type ==='select' ) {
+	input = $('<select />')
+	  .appendTo(border);
+	  $('<option>')
+	  .val('')
+	  .text('--選択してください--')
+	  .attr('selected','selected')
+	  .appendTo(input)
+	for ( var o in question.a.options ){
+	  $('<option>')
+	    .val(question.a.options[o][0])
+	    .text(question.a.options[o][1])
+	    .appendTo(input)
+	}
+      }else if ( question.a.type ==='checkbox' ) {
+	for ( var c in question.a.options ) {
+	    $('<label>')
+	    .text(question.a.options[c])
+	    .prepend(
+		    $('<input />')
+		    .attr('type','checkbox')
+		    .attr('name',c))
+	    .appendTo(border);
+	  border.append('<br>')
+	}
+	$('<div />')
+	  .css('float','left')
+	  .text('その他:')
+	  .appendTo(border);
+	var others = $('<div />')
+	  .css('float','left')
+	  .appendTo(border);
+	for ( var o = 0 ; o < question.a.others ; o++ ){
+	  $('<input />')
+	    .attr('type','text')
+	    .attr('name',question.a.name+'O'+o)
+	    .appendTo(others);
+	  others.append('<br>');
+	}
+      }
+      if ( ! input ) continue;
+      input.attr('name',question.a.name)
+      for ( var a in question.a.attr ){
+	input.attr(a,question.a.attr[a]);
+      }
+    }
+  }
+  function reset(){
+    $('#form').empty();
+    $('#question .message').empty();
+    $('#finish').hide();
+      $.ajax({
+	url:url+'form/',
+	dataType: 'jsonp',
+	jsonp: 'jsonp',
+	data:{
+	  'filter__id': 'Q'
+	},
+	success: function(data,type){
+	  gen_form(data.rows[0]);
+	    $('#form').show();
+	    $('#finish').show();
+	}
+      });
+  }
+  function thanks (uid){
+    function post_error() {
+	$('#question .message').empty();
+	$('#question .message')
+	.append(
+		 $('<span />')
+		 .addClass('error')
+		 .text('送信失敗'));
+	$('#finish').show();
+	$('#form').show();
+    }
+    var TO = setTimeout(function(){
+      post_error();
+    },5000);
+      $.ajax({
+	url:url+'ans/',
+	dataType: 'jsonp',
+	jsonp: 'jsonp',
+	data:{
+	  'filter__id': uid
+	},
+	success: function(data,type){
+	  clearTimeout(TO);
+	  if (data.rows[0]._id===uid){
+	      $('#question .message').empty();
+	      $('<h2 />')
+	      .text('ご協力ありがとうございました。')
+	      .appendTo('#question .message');
+	    setTimeout(function(){
+	      reset();
+	    },10000);
+	  }else{
+	    post_error();
+	  }
+	}
+      });
+  }
+   function post(){
+       $('#question .message').empty();
+     var ok = true;
+     var id = $('#form input[name="_id"]').val();
+     var data = {
+       _id : id
+     };
+     form.find('div[name]').each(function(){
+       var required = $(this).attr('required');
+       var name = $(this).attr('name');
+       var type = $(this).attr('type');
+       if ( type === 'checkbox' ) {
+	 data[name] = [];
+	 $(this).find('input[type="checkbox"]').each(function(){
+	   if ( $(this).attr('checked' )) {
+	     data[name].push($(this).attr('name'));
+	   }
+	 });
+	 $(this).find('input[type="text"]').each(function(){
+	   if ( $(this).val() ) {
+	     data[name].push($(this).val());
+	   }
+	 });
+       }else{
+	 data[name] = $(this).find('*:input').val();
+       }
+       if ( required && ! data[name] ) {
+	   $(this).addClass('error');
+	 ok = false;
+       }else{
+	   $(this).removeClass('error');
+       }
+     });
+     if ( ok ) {
+       $('#finish').hide();
+       $('#form').hide();
+	 $('#question .message')
+	 .append(
+		 $('<span />')
+		  .text('送信中・・・'));
+       
+       $.ajax({
+	 url: url+'ans/',
+	 type: 'POST',
+	 dataType: 'html',
+	 jsonp: 'jsonp',
+	 data: JSON.stringify(data),
+	 uid: id,
+	 complete: function(){
+	   thanks(this.uid);
+	 }
+       });
+     }else{
+	 $('#question .message')
+	 .append(
+		  $('<span />')
+		  .addClass('error')
+		  .text('必須項目エラー'));
+     }
+   }
+   $('#finish').click(function(){
+     post();
+   });
+   reset();
+});
+
+-->
+</script>
+</body>
+</html>
