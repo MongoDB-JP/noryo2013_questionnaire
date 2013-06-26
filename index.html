@@ -66,15 +66,28 @@ body {
   <div id="question">
     <h1>MongoDBアンケート</h1>
     <div class="message"></div>
-    <table id="form" post="http://example.mongodb.jp:28017/questions/"></table>
+    <table id="form" post="http://example.mongodb.jp:28017/questions/" ajax="http://example.mongodb.jp/rest/questions/"></table>
     <input id="finish" type="button" value="送信"></input>
   </div>
 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
 <script language=javascript>
 <!--
 $(function(){
+  function getUrlVars(){
+    var vars = [], hash; 
+    var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&'); 
+    for(var i = 0; i < hashes.length; i++) { 
+      hash = hashes[i].split('='); 
+      vars.push(hash[0]); 
+      vars[hash[0]] = decodeURIComponent(hash[1]);
+    } 
+    return vars;
+  } 
   var form = $('#form');
   var url = form.attr('post');
+  var ajax = form.attr('ajax');
+  var ajax_mode = getUrlVars()['ajax'];
+
   function uid (){
    function genid(){
      return (((1+Math.random())*0x10000)|0).toString(16).substring(1);
@@ -177,6 +190,20 @@ $(function(){
     $('#form').empty();
     $('#question .message').empty();
     $('#finish').hide();
+    if ( ajax_mode ) {
+      $.ajax({
+	url:ajax+'form/',
+	dataType: 'json',
+	data:{
+	  'filter__id': 'Q'
+	},
+	success: function(data,type){
+	  gen_form(data.rows[0]);
+	    $('#form').show();
+	    $('#finish').show();
+	}
+      });
+    }else{
       $.ajax({
 	url:url+'form/',
 	dataType: 'jsonp',
@@ -190,43 +217,26 @@ $(function(){
 	    $('#finish').show();
 	}
       });
-  }
-  function thanks (uid){
-    function post_error() {
-	$('#question .message').empty();
-	$('#question .message')
-	.append(
-		 $('<span />')
-		 .addClass('error')
-		 .text('送信失敗'));
-	$('#finish').show();
-	$('#form').show();
     }
-    var TO = setTimeout(function(){
-      post_error();
-    },5000);
-      $.ajax({
-	url:url+'ans/',
-	dataType: 'jsonp',
-	jsonp: 'jsonp',
-	data:{
-	  'filter__id': uid
-	},
-	success: function(data,type){
-	  clearTimeout(TO);
-	  if (data.rows[0]._id===uid){
-	      $('#question .message').empty();
-	      $('<h2 />')
-	      .text('ご協力ありがとうございました。')
-	      .appendTo('#question .message');
-	    setTimeout(function(){
-	      reset();
-	    },10000);
-	  }else{
-	    post_error();
-	  }
-	}
-      });
+  }
+  function post_error() {
+      $('#question .message').empty();
+      $('#question .message')
+      .append(
+	      $('<span />')
+	      .addClass('error')
+	      .text('送信失敗'));
+      $('#finish').show();
+      $('#form').show();
+  }
+  function thanks (){
+      $('#question .message').empty();
+      $('<h2 />')
+      .text('ご協力ありがとうございました。')
+      .appendTo('#question .message');
+    setTimeout(function(){
+      reset();
+    },10000);
   }
    function post(){
        $('#question .message').empty();
@@ -268,18 +278,50 @@ $(function(){
 	 .append(
 		 $('<span />')
 		  .text('送信中・・・'));
-       
-       $.ajax({
-	 url: url+'ans/',
-	 type: 'POST',
-	 dataType: 'html',
-	 jsonp: 'jsonp',
-	 data: JSON.stringify(data),
-	 uid: id,
-	 complete: function(){
-	   thanks(this.uid);
-	 }
-       });
+       var data_json = JSON.stringify(data);
+      $.ajax({
+	url:ajax+'ans/',
+	type: 'POST',
+	dataType: 'json',
+	data: data_json,
+	success: function(data,type){
+	  if( ! ajax_mode ) {
+	      $.ajax({
+		url: url+'ans/',
+		type: 'POST',
+		dataType: 'html',
+		jsonp: 'jsonp',
+		data: data_json,
+		complete: function(){
+		  var TO = setTimeout(function(){
+		    post_error();
+		  },5000);
+		    $.ajax({
+		      url:url+'ans/',
+		      dataType: 'jsonp',
+		      jsonp: 'jsonp',
+		      data:{
+			  'filter__id': id
+		      },
+		      success: function(data,type){
+			clearTimeout(TO);
+			if (data.rows[0]._id===id){
+			  thanks();
+			}else{
+			  post_error();
+			}
+		      }
+		    });
+		}
+	      });
+	  }else{
+	    thanks();
+	  }
+	},
+	error: function(){
+	  post_error();
+	}
+      });
      }else{
 	 $('#question .message')
 	 .append(
